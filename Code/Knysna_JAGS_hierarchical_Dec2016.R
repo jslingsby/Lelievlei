@@ -19,12 +19,16 @@ library(ggplot2)
 library(GGally)
 library(reshape2)
 library(dplyr)
+library(ggpubr)
 
 
 #Set working directory
 if(Sys.getenv("USER")=='jasper') setwd("/Users/jasper/Dropbox/SAEON/Projects/Knysna forest")
 
-load("/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_21Dec2016.Rdata")
+#load("/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_21Dec2016.Rdata")
+
+load("/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_19Nov2018.Rdata")
+
 
 ###############################################################################
 ###Hierarchical logistic regression model to explain mortality across both intervals
@@ -143,7 +147,9 @@ inits<-list(
 )
 
 ###Run model
-parameters<-c("alpha", "betaD", "betaY", "betaC", "betaP", "betaS", "plot.beta", "spp.beta") #, "plot.mu", "plot.tau", "spp.mu", "spp.tau")
+parameters<-c("alpha", "betaD", "betaY", "betaC", "betaP", "betaS", "plot.beta", "spp.beta") #, "plot.mu", "plot.tau", "spp.mu", "spp.tau", "mu") #add/remove "mu"?
+
+#parameters<-c("alpha", "betaD", "betaY", "betaC", "betaP", "betaS", "plot.beta", "spp.beta", "mu")
 
 hlogmod<- jags(data = hdat1,
               inits = inits,
@@ -162,7 +168,123 @@ plot(hlogmod)
 #gelman.plot(as.mcmc(hlogmod))
 
 lapply(hlogmod$BUGSoutput$mean, FUN=exp) #exponentiated point estimates
-exp(hlogmod$BUGSoutput$summary[,c(1,3,7)]) #point estimates with their 95% credible intervals
+hldat <- as.data.frame(exp(hlogmod$BUGSoutput$summary[,c(1,3,7)])) #point estimates with their 95% credible intervals
+
+##########################################################
+###Plotting
+
+##[Stem Condition]
+## select betas of interest
+plot.dat <- hldat[grep("betaC", rownames(hldat)),]
+Obs <- MortDat_trim %>% group_by(Condition) %>% summarise(mort = mean(Mortality))
+plot.dat <- cbind(plot.dat, Obs)
+
+## order the data by the factor scores, for better visualization
+plot.dat <- plot.dat[order(plot.dat$mean), ]
+
+## order the observation IDs as well (seems redundant, but is necessary)
+plot.dat$Condition <- factor(x = as.character(plot.dat$Condition), levels = as.character(plot.dat$Condition))
+
+## make plots
+sck <- ggplot(plot.dat, aes(x = Condition, y = mean, ymin = `2.5%`, ymax = `97.5%`))
+(sck <- sck + geom_pointrange() + ylab("Estimate"))
+
+scl <- ggplot(plot.dat, aes(x = mort, y = mean))
+(scl <- scl + geom_point() + geom_segment(aes(x = mort, xend = mort, y = `2.5%`, yend = `97.5%`)) + ylab("Estimate") + xlab("Average mortality by condition"))
+
+ggarrange(sck,scl, ncol = 2)
+
+##[Species]
+## select betas of interest
+plot.dat <- hldat[grep("betaS", rownames(hldat)),]
+Obs <- MortDat_trim %>% group_by(Species) %>% summarise(mort = mean(Mortality))
+plot.dat <- cbind(plot.dat, Obs)
+
+## order the data by the factor scores, for better visualization
+plot.dat <- plot.dat[order(plot.dat$mean), ]
+
+## order the observation IDs as well (seems redundant, but is necessary)
+plot.dat$Species <- factor(x = as.character(plot.dat$Species), levels = as.character(plot.dat$Species))
+
+## make plot 
+spk <- ggplot(plot.dat, aes(x = Species, y = mean, ymin = `2.5%`, ymax = `97.5%`))
+(spk <- spk + geom_pointrange() + ylab("Estimate") + coord_flip())
+
+spl <- ggplot(plot.dat, aes(x = mort, y = mean))
+(spl <- spl + geom_point() + 
+    geom_segment(aes(x = mort, xend = mort, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate") + xlab("Average mortality by species") + 
+    coord_flip())
+
+ggarrange(spk,spl, ncol = 2)
+
+##[Species hierarchical regression]
+plot.dat <- inner_join(plot.dat, tmeans_trim)
+
+spl_la <- ggplot(plot.dat, aes(x = Leaf_Area, y = mean))
+(spl_la <- spl_la + geom_point() + 
+    geom_segment(aes(x = Leaf_Area, xend = Leaf_Area, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate of mortality by species") + xlab("Leaf Area") + 
+    coord_flip())
+
+spl_sla <- ggplot(plot.dat, aes(x = SLA, y = mean))
+(spl_sla <- spl_sla + geom_point() + 
+    geom_segment(aes(x = SLA, xend = SLA, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate of mortality by species") + xlab("Specific Leaf Area (SLA)") + 
+    coord_flip())
+
+spl_mh <- ggplot(plot.dat, aes(x = Maximum_Height, y = mean))
+(spl_mh <- spl_mh + geom_point() + 
+    geom_segment(aes(x = Maximum_Height, xend = Maximum_Height, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate of mortality by species") + xlab("Maximum Height") + 
+    coord_flip())
+
+ggarrange(spl_la, spl_sla, spl_mh, ncol = 3)
+
+##[Plots]
+## select betas of interest
+plot.dat <- hldat[grep("betaP", rownames(hldat)),]
+Obs <- MortDat_trim %>% group_by(Plot) %>% summarise(mort = mean(Mortality))
+plot.dat <- cbind(plot.dat, Obs)
+
+## order the data by the factor scores, for better visualization
+plot.dat <- plot.dat[order(plot.dat$mean), ]
+
+## order the observation IDs as well (seems redundant, but is necessary)
+plot.dat$Plot <- factor(x = as.character(plot.dat$Plot), levels = as.character(plot.dat$Plot))
+
+## make plot 
+pk <- ggplot(plot.dat, aes(x = Plot, y = mean, ymin = `2.5%`, ymax = `97.5%`))
+(pk <- pk + geom_pointrange() + ylab("Estimate") +
+  theme(axis.text.y = element_blank()) +
+  coord_flip())
+
+pl <- ggplot(plot.dat, aes(x = mort, y = mean))
+(pl <- pl + geom_point() + 
+    geom_segment(aes(x = mort, xend = mort, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate") + xlab("Average mortality by plot") + 
+    coord_flip())
+
+ggarrange(pk,pl, ncol = 2)
+
+##[Plot hierarchical regression]
+
+PlotEnv <- data.frame(Plot = datSum$Plot[1:108], StemD = StemD, BA = BA)
+plot.dat <- inner_join(plot.dat, PlotEnv)
+
+pl_sd <- ggplot(plot.dat, aes(x = StemD, y = mean))
+(pl_sd <- pl_sd + geom_point() + 
+    geom_segment(aes(x = StemD, xend = StemD, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate of mortality by plot") + xlab("Stem Density") + 
+    coord_flip())
+
+pl_ba <- ggplot(plot.dat, aes(x = BA, y = mean))
+(pl_ba <- pl_ba + geom_point() + 
+    geom_segment(aes(x = BA, xend = BA, y = `2.5%`, yend = `97.5%`)) +
+    ylab("Estimate of mortality by plot") + xlab("Basal Area") + 
+    coord_flip())
+
+ggarrange(pl_sd, pl_ba, ncol = 2)
 
 ###############################################################################
 ###HLM to explain mortality for each interval separately

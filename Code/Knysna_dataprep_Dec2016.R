@@ -168,6 +168,13 @@ MortDat <- data.frame(Plot = datAll$PLID, Species	= factor(datAll$SPECIES), Year
 MortDat <- na.omit(MortDat)
 MortDat <- merge(MortDat, tmeans)
 
+###Mortality with 2011 data for 2021 prediction
+MortDatAll <- data.frame(Plot = datAll$PLID, Species	= factor(datAll$SPECIES), Year = factor(c(rep(2001, nrow(datAll)), rep(2011, nrow(datAll)), rep(2021, nrow(datAll)))), Mortality = c(datAll$Mortality2001, datAll$Mortality2011, rep(NA, nrow(datAll))), Condition = factor(c(datAll$Condition1991, datAll$Condition2001,datAll$Condition2011), levels = c("Healthy", "Leaning", "Damaged", "Unhealthy", "Dying")),	Diameter = c(datAll$DBH2, datAll$DBH3, datAll$DBH4))
+#Recruitment = c(datAll$Recruitment2001, datAll$Recruitment2011),
+
+MortDatAll <- MortDatAll[-which(rowSums(is.na(MortDatAll)) > 1), ]
+MortDatAll <- merge(MortDatAll, tmeans)
+
 ###AllDat
 names(datAll)[which(names(datAll)=="SPECIES")] <- "Species"
 datAll <- merge(datAll, tmeans)
@@ -324,5 +331,6 @@ tmeans <- merge(tmeans, climmeans, all.x = T)
 ###Clean up and save
 ###############################################################################
 
-save(list = c("AnnualDynamics", "StemCondition", "Plot_dynamics", "Species_dynamics", "MortDat", "datAll", "datSum", "tmeans"), file = "/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_3Oct2017.Rdata")
+#save(list = c("AnnualDynamics", "StemCondition", "Plot_dynamics", "Species_dynamics", "MortDat", "datAll", "datSum", "tmeans"), file = "/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_3Oct2017.Rdata")
 
+save(list = c("AnnualDynamics", "StemCondition", "Plot_dynamics", "Species_dynamics", "MortDat", "MortDatAll", "datAll", "datSum", "tmeans"), file = "/Users/jasper/Dropbox/SAEON/Projects/Knysna forest/Data/KnysnaData_19Nov2018.Rdata")
